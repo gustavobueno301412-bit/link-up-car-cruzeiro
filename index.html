@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkUpCar - Gustavo</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #0f0f0f; color: white; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; flex-direction: column; }
+        .card { background: #1a1a1a; padding: 40px; border-radius: 30px; border: 2px solid #333; text-align: center; box-shadow: 0 0 30px rgba(0,0,0,0.8); width: 320px; }
+        .btn {
+            width: 200px; height: 200px; border-radius: 50%; border: 8px solid #222;
+            font-size: 1.2rem; font-weight: bold; cursor: pointer; transition: 0.4s;
+            background: #222; color: #555; outline: none; margin: 0 auto;
+        }
+        .on { background: #1d976c; color: white; border-color: #00ff88; box-shadow: 0 0 40px #1d976c; transform: scale(1.05); }
+        .bloqueado { background: #8e0000; color: white; border-color: #ff0000; }
+        #msg { margin-top: 25px; font-weight: bold; letter-spacing: 1px; }
+
+        /* Estilos do Modal de Cadastro */
+        input, textarea { width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid #333; background: #222; color: white; box-sizing: border-box; outline: none; }
+        .btn-enviar { width: 100%; padding: 15px; margin-top: 15px; border-radius: 10px; border: none; background: #1d976c; color: white; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2 style="color: #00ff88; margin-bottom: 20px;">🚗 LINKUPCAR</h2>
+        <button id="btnPrincipal" class="btn" onclick="tentarLigar()">ENTRAR<br>NA RUA</button>
+        <div id="msg">STATUS: OFFLINE</div>
+
+        <div style="margin-top: 30px;">
+            <a href="javascript:void(0)" onclick="abrirModal()" style="color: #00ff88; text-decoration: none; font-size: 0.8rem; font-weight: bold; opacity: 0.7;">TRABALHE CONOSCO</a>
+        </div>
+    </div>
+
+    <div id="modalCadastro" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); align-items:center; justify-content:center; z-index:1000; overflow-y: auto;">
+        <div class="card" style="width: 90%; max-width: 350px;">
+            <h3 style="color: #00ff88; margin-top: 0;">CADASTRO</h3>
+            <input type="text" id="cNome" placeholder="Nome Completo">
+            <input type="tel" id="cWhats" placeholder="Seu WhatsApp">
+            <input type="text" id="cCarro" placeholder="Modelo do Carro">
+            <input type="text" id="cCor" placeholder="Cor">
+            <input type="text" id="cPlaca" placeholder="Placa">
+            <textarea id="cDetalhes" placeholder="Detalhes Adicionais"></textarea>
+
+            <div style="background: #111; padding: 10px; border-radius: 8px; font-size: 0.7rem; text-align: left; color: #888; margin: 10px 0; height: 80px; overflow-y: auto; border: 1px solid #333;">
+                Autorizo o uso de imagem/dados no LinkUpCar. O app não responde por transações entre motorista/cliente. Proibido assédio ou ameaças.
+            </div>
+
+            <label style="font-size: 0.75rem; color: #00ff88; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                <input type="checkbox" id="cTermos"> ACEITO OS TERMOS
+            </label>
+
+            <button class="btn-enviar" onclick="enviarCadastro()">FINALIZAR NO WHATSAPP</button>
+            <p onclick="fecharModal()" style="color: #555; cursor: pointer; margin-top: 15px; font-size: 0.8rem;">CANCELAR</p>
+        </div>
+    </div>
+
+<script>
+    const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbybTgimZPGpYMhqwp1Srde-ShgBZln79FudHVl1rjqvy0ZSbJLH7yDFcVmdcxDvbD66/exec";
+    const MEU_ID = 1;
+    const MEU_WHATSAPP = "5512997103328"; // Seu número aqui
+    let ativo = false;
+
+    // --- Lógica Original do Botão Principal ---
+    async function tentarLigar() {
+        if (ativo) { desligar(); return; }
+        const msg = document.getElementById('msg');
+        const btn = document.getElementById('btnPrincipal');
+        msg.innerText = "⏳ VERIFICANDO...";
+        msg.style.color = "orange";
+
+        try {
+            const response = await fetch(URL_SCRIPT + "?action=checkStatus&id=" + MEU_ID);
+            const res = await response.text();
+            if (res.trim().toLowerCase() === "ativo") { ligarSucesso(); }
+            else {
+                btn.className = "btn bloqueado";
+                btn.innerHTML = "BLOQUEADO ❌";
+                msg.innerText = "PAGAMENTO PENDENTE!";
+                msg.style.color = "red";
+            }
+        } catch (error) {
+            msg.innerText = "ERRO DE REDE!";
+        }
+    }
+
+    function ligarSucesso() {
+        ativo = true;
+        document.getElementById('btnPrincipal').className = "btn on";
+        document.getElementById('btnPrincipal').innerHTML = "ONLINE 🟢";
+        document.getElementById('msg').innerText = "TRABALHANDO...";
+        document.getElementById('msg').style.color = "#00ff88";
+    }
+
+    function desligar() {
+        ativo = false;
+        document.getElementById('btnPrincipal').className = "btn";
+        document.getElementById('btnPrincipal').innerHTML = "ENTRAR<br>NA RUA";
+        document.getElementById('msg').innerText = "STATUS: OFFLINE";
+        document.getElementById('msg').style.color = "white";
+    }
+
+    // --- Lógica do Novo Modal de Cadastro ---
+    function abrirModal() { document.getElementById('modalCadastro').style.display = 'flex'; }
+    function fecharModal() { document.getElementById('modalCadastro').style.display = 'none'; }
+
+    function enviarCadastro() {
+        const nome = document.getElementById('cNome').value;
+        const zap = document.getElementById('cWhats').value;
+        const carro = document.getElementById('cCarro').value;
+        const cor = document.getElementById('cCor').value;
+        const placa = document.getElementById('cPlaca').value;
+        const detalhes = document.getElementById('cDetalhes').value;
+        const aceitou = document.getElementById('cTermos').checked;
+
+        if (!nome || !zap || !carro || !placa) { alert("Preencha os campos obrigatórios!"); return; }
+        if (!aceitou) { alert("Aceite os termos para continuar!"); return; }
+
+        const mensagem = `*NOVO CADASTRO LINKUPCAR*%0A%0A` +
+                        `👤 *Nome:* ${nome}%0A` +
+                        `📱 *Zap:* ${zap}%0A` +
+                        `🚗 *Carro:* ${carro}%0A` +
+                        `🎨 *Cor:* ${cor}%0A` +
+                        `🔢 *Placa:* ${placa}%0A` +
+                        `📝 *Obs:* ${detalhes}%0A%0A` +
+                        `📢 *Agora mande uma foto sua e do seu carro aqui pelo WhatsApp!*`;
+
+        window.open(`https://api.whatsapp.com/send?phone=${MEU_WHATSAPP}&text=${mensagem}`, '_blank');
+        fecharModal();
+    }
+</script>
+</body>
+</html>
+
+ 

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkUpCar - Cruzeiro</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body { margin: 0; padding: 0; background: #121212; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #map { height: 100vh; width: 100vw; z-index: 1; }
+       
+        .control-panel {
+            position: fixed; top: 15px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 400px; z-index: 1000;
+            background: rgba(26, 26, 26, 0.95); padding: 15px;
+            border-radius: 20px; border: 2px solid #FF8C00; box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+        }
+
+        input {
+            width: 100%; padding: 12px; margin: 5px 0; border-radius: 10px;
+            border: 1px solid #444; background: #1a1a1a; color: white; font-size: 16px; box-sizing: border-box;
+        }
+
+        .price-info {
+            background: #FF8C00; color: #000; font-weight: bold;
+            text-align: center; padding: 10px; border-radius: 10px; margin-top: 8px; font-size: 14px;
+        }
+
+        .driver-marker {
+            width: 55px; height: 55px; border-radius: 50%; border: 3px solid #FF8C00;
+            background-size: cover; background-position: center; box-shadow: 0 0 15px #FF8C00;
+        }
+
+        .btn-call-fast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: #FF8C00; color: white; padding: 18px; width: 85%; max-width: 320px;
+            border-radius: 50px; font-weight: bold; border: none; z-index: 1000;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5); cursor: pointer; font-size: 16px;
+        }
+
+        .leaflet-popup-content-wrapper { background: #1a1a1a !important; color: white !important; border: 1px solid #FF8C00; }
+        .leaflet-popup-tip { background: #FF8C00 !important; }
+    </style>
+</head>
+<body>
+
+    <div class="control-panel">
+        <input type="text" id="nome_cliente" placeholder="👤 Seu nome">
+        <input type="text" id="destino" placeholder="🏁 Para onde vamos em Cruzeiro?">
+        <input type="text" id="referencia" placeholder="📍 Ponto de referência">
+        <div id="info-corrida" class="price-info" style="display:none;">
+            📏 Distância: <span id="km">0</span> km | 💰 Valor: R$ <span id="valor">0,00</span>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <button class="btn-call-fast" onclick="chamarMaisProximo()">⚡ CHAMAR O MAIS PRÓXIMO</button>
+
+<script>
+    const URL_API = "https://script.google.com/macros/s/AKfycbybTgimZPGpYMhqwp1Srde-ShgBZln79FudHVl1rjqvy0ZSbJLH7yDFcVmdcxDvbD66/exec";
+    const TAXA_MINIMA = 8.00;
+    const VALOR_KM = 2.50;
+
+    const map = L.map('map', { zoomControl: false }).setView([-22.5774, -44.9703], 15);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+    let motoristasOnline = [];
+    let markers = {};
+    let userLat, userLog;
+
+    // 1. Localizar Cliente e salvar coordenadas
+    map.locate({setView: true, maxZoom: 16, watch: true, enableHighAccuracy: true});
+    map.on('locationfound', (e) => {
+        userLat = e.latlng.lat;
+        userLog = e.latlng.lng;
+        if (!markers['meu_ponto']) {
+            markers['meu_ponto'] = L.circle(e.latlng, {radius: 12, color: '#007AFF', fillOpacity: 0.8}).addTo(map);
+        } else {
+            markers['meu_ponto'].setLatLng(e.latlng);
+        }
+    });
+
+    // 2. Cálculo de preço ao digitar destino
+    document.getElementById('destino').addEventListener('input', function() {
+        if(!userLat) return;
+        let kmSimulado = (Math.random() * (5 - 1.5) + 1.5).toFixed(1);
+        let valorFinal = (TAXA_MINIMA + (kmSimulado * VALOR_KM)).toFixed(2);
+       
+        document.getElementById('info-corrida').style.display = 'block';
+        document.getElementById('km').innerText = kmSimulado;
+        document.getElementById('valor').innerText = valorFinal.replace('.', ',');
+    });
+
+    async function atualizarMotoristas() {
+        try {
+            const res = await fetch(URL_API + "?action=getOnlineDrivers");
+            motoristasOnline = await res.json();
+           
+            motoristasOnline.forEach(m => {
+                if (!markers[m.id]) {
+                    let icon = L.divIcon({
+                        html: `<div class="driver-marker" style="background-image: url('${m.foto_perfil}')"></div>`,
+                        className: '', iconSize: [55, 55]
+                    });
+                    markers[m.id] = L.marker([m.lat, m.log], {icon}).addTo(map);
+                   
+                    markers[m.id].bindPopup(`
+                        <div style="text-align:center;">
+                            <b style="color:#FF8C00; font-size:18px;">${m.nome}</b><br>
+                            <img src="${m.foto_carro}" style="width:140px; border-radius:8px; margin:8px 0; border:1px solid #444;"><br>
+                            <div style="margin-bottom:10px;">
+                                <span style="font-weight:bold;">🚗 ${m.carro}</span>
+                            </div>
+                            <button onclick="enviarPedido('${m.id}')" style="background:#25D366; color:white; border:none; padding:12px; border-radius:8px; width:100%; font-weight:bold; cursor:pointer;">
+                                SOLICITAR AGORA ✅
+                            </button>
+                        </div>
+                    `);
+                } else {
+                    markers[m.id].setLatLng([m.lat, m.log]);
+                }
+            });
+        } catch (e) { console.log("Erro na API"); }
+    }
+
+    // 3. Enviar pedido com os dados e localização automática
+    function enviarPedido(id) {
+        let m = motoristasOnline.find(x => x.id == id);
+        let nome = document.getElementById('nome_cliente').value;
+        let dest = document.getElementById('destino').value;
+        let ref = document.getElementById('referencia').value || "Não informada";
+        let km = document.getElementById('km').innerText;
+        let valor = document.getElementById('valor').innerText;
+
+        if(!nome) return alert("Por favor, digite seu nome!");
+        if(!dest) return alert("Por favor, digite seu destino!");
+        if(!userLat) return alert("Aguarde o GPS carregar sua localização...");
+
+        // Link de localização automática (Google Maps para o motorista navegar)
+        let linkMapa = `https://www.google.com/maps?q=${userLat},${userLog}`;
+
+        let msg = `*LINKUPCAR: NOVO PEDIDO*%0A` +
+                  `------------------------------%0A` +
+                  `👤 *Passageiro:* ${nome}%0A` +
+                  `🏁 *Destino:* ${dest}%0A` +
+                  `📍 *Referência:* ${ref}%0A%0A` +
+                  `📏 *Distância:* ${km} km%0A` +
+                  `💰 *Valor:* R$ ${valor}%0A` +
+                  `------------------------------%0A` +
+                  `📍 *Localização Atual (GPS):*%0A${linkMapa}%0A%0A` +
+                  `_Olá ${m.nome}, pode me buscar?_`;
+
+        window.open(`https://wa.me/55${m.whatsapp}?text=${msg}`, '_blank');
+    }
+
+    function chamarMaisProximo() {
+        if (!userLat || motoristasOnline.length === 0) return alert("Buscando motoristas próximos...");
+       
+        let ordenados = motoristasOnline.sort((a, b) => {
+            let distA = Math.hypot(a.lat - userLat, a.log - userLog);
+            let distB = Math.hypot(b.lat - userLat, b.log - userLog);
+            return distA - distB;
+        });
+        enviarPedido(ordenados[0].id);
+    }
+
+    setInterval(atualizarMotoristas, 5000);
+    atualizarMotoristas();
+</script>
+</body>
+</html>
+
+ 
