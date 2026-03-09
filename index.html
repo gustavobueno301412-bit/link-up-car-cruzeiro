@@ -37,7 +37,7 @@
         <div class="card" style="width: 90%; max-width: 350px;">
             <h3 style="color: #00ff88; margin-top: 0;">CADASTRO</h3>
             <input type="text" id="cNome" placeholder="Nome Completo">
-            <input type="tel" id="cWhats" placeholder="Seu WhatsApp">
+            <input type="tel" id="cWhats" placeholder="Seu WhatsApp (DDD)">
             <input type="text" id="cCarro" placeholder="Modelo do Carro">
             <input type="text" id="cCor" placeholder="Cor">
             <input type="text" id="cPlaca" placeholder="Placa">
@@ -107,7 +107,7 @@
 
     function enviarCadastro() {
         const nome = document.getElementById('cNome').value;
-        const zap = document.getElementById('cWhats (DDD)').value;
+        const zap = document.getElementById('cWhats').value;
         const carro = document.getElementById('cCarro').value;
         const cor = document.getElementById('cCor').value;
         const placa = document.getElementById('cPlaca').value;
