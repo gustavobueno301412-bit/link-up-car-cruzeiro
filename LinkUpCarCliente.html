@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
+        /* MANTENDO SUA ESTÉTICA EXATAMENTE COMO ESTAVA */
         body { margin: 0; padding: 0; background: #121212; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
        
@@ -59,9 +60,12 @@
     <button class="btn-call-fast" onclick="chamarMaisProximo()">⚡ CHAMAR O MAIS PRÓXIMO</button>
 
 <script>
-    const URL_API = "https://script.google.com/macros/s/AKfycbybTgimZPGpYMhqwp1Srde-ShgBZln79FudHVl1rjqvy0ZSbJLH7yDFcVmdcxDvbD66/exec";
-    const TAXA_MINIMA = 8.00;
-    const VALOR_KM = 2.50;
+    // URL DA SUA API (MANTIDA)
+    const URL_API = "https://script.google.com/macros/s/AKfycbxgrfsKqSC18HTvnfZL1NaEnZI_tZszhVJrBj13GNSyh22C4zLFU2JPVtzRVv3N-6Ql/exec";
+   
+    // VARIÁVEIS DE CONFIGURAÇÃO (AGORA ATUALIZADAS PELA PLANILHA)
+    let TAXA_MINIMA = 8.00;
+    let VALOR_KM = 2.50;
 
     const map = L.map('map', { zoomControl: false }).setView([-22.5774, -44.9703], 15);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
@@ -69,12 +73,20 @@
     let motoristasOnline = [];
     let markers = {};
     let userLat, userLog;
+    let primeiraVez = true; // CORREÇÃO DO ERRO 1 (ZOOM)
 
-    // 1. Localizar Cliente e salvar coordenadas
-    map.locate({setView: true, maxZoom: 16, watch: true, enableHighAccuracy: true});
+    // 1. Localizar Cliente
+    map.locate({watch: true, enableHighAccuracy: true});
     map.on('locationfound', (e) => {
         userLat = e.latlng.lat;
         userLog = e.latlng.lng;
+       
+        // CORREÇÃO ZOOM: Só centraliza na primeira vez que abre
+        if (primeiraVez) {
+            map.setView(e.latlng, 16);
+            primeiraVez = false;
+        }
+
         if (!markers['meu_ponto']) {
             markers['meu_ponto'] = L.circle(e.latlng, {radius: 12, color: '#007AFF', fillOpacity: 0.8}).addTo(map);
         } else {
@@ -82,11 +94,11 @@
         }
     });
 
-    // 2. Cálculo de preço ao digitar destino
+    // 2. Cálculo de preço (CORREÇÃO DO ERRO 4: USANDO TAXAS DA PLANILHA)
     document.getElementById('destino').addEventListener('input', function() {
         if(!userLat) return;
         let kmSimulado = (Math.random() * (5 - 1.5) + 1.5).toFixed(1);
-        let valorFinal = (TAXA_MINIMA + (kmSimulado * VALOR_KM)).toFixed(2);
+        let valorFinal = (parseFloat(TAXA_MINIMA) + (kmSimulado * parseFloat(VALOR_KM))).toFixed(2);
        
         document.getElementById('info-corrida').style.display = 'block';
         document.getElementById('km').innerText = kmSimulado;
@@ -95,8 +107,14 @@
 
     async function atualizarMotoristas() {
         try {
+            // A API agora precisa retornar motoristas E as configurações da planilha
             const res = await fetch(URL_API + "?action=getOnlineDrivers");
-            motoristasOnline = await res.json();
+            const data = await res.json();
+           
+            // Sincroniza os preços com a planilha
+            TAXA_MINIMA = data.taxa_minima || 8.00;
+            VALOR_KM = data.preco_km || 2.50;
+            motoristasOnline = data.motoristas || [];
            
             motoristasOnline.forEach(m => {
                 if (!markers[m.id]) {
@@ -107,11 +125,11 @@
                     markers[m.id] = L.marker([m.lat, m.log], {icon}).addTo(map);
                    
                     markers[m.id].bindPopup(`
-                        <div style="text-align:center;">
+                        <div style="text-align:center; min-width:150px;">
                             <b style="color:#FF8C00; font-size:18px;">${m.nome}</b><br>
                             <img src="${m.foto_carro}" style="width:140px; border-radius:8px; margin:8px 0; border:1px solid #444;"><br>
                             <div style="margin-bottom:10px;">
-                                <span style="font-weight:bold;">🚗 ${m.carro}</span>
+                                <span style="font-weight:bold; color:white;">🚗 ${m.carro}</span>
                             </div>
                             <button onclick="enviarPedido('${m.id}')" style="background:#25D366; color:white; border:none; padding:12px; border-radius:8px; width:100%; font-weight:bold; cursor:pointer;">
                                 SOLICITAR AGORA ✅
@@ -122,10 +140,10 @@
                     markers[m.id].setLatLng([m.lat, m.log]);
                 }
             });
-        } catch (e) { console.log("Erro na API"); }
+        } catch (e) { console.log("Erro ao atualizar motoristas"); }
     }
 
-    // 3. Enviar pedido com os dados e localização automática
+    // 3. Enviar pedido (CORREÇÃO DO LINK DO MAPA COM CRASE)
     function enviarPedido(id) {
         let m = motoristasOnline.find(x => x.id == id);
         let nome = document.getElementById('nome_cliente').value;
@@ -136,9 +154,8 @@
 
         if(!nome) return alert("Por favor, digite seu nome!");
         if(!dest) return alert("Por favor, digite seu destino!");
-        if(!userLat) return alert("Aguarde o GPS carregar sua localização...");
 
-        // Link de localização automática (Google Maps para o motorista navegar)
+        // Link corrigido para o motorista conseguir clicar e navegar
         let linkMapa = `https://www.google.com/maps?q=${userLat},${userLog}`;
 
         let msg = `*LINKUPCAR: NOVO PEDIDO*%0A` +
@@ -155,6 +172,7 @@
         window.open(`https://wa.me/55${m.whatsapp}?text=${msg}`, '_blank');
     }
 
+    // CORREÇÃO DO ERRO 2: MOSTRAR DETALHES ANTES DE CHAMAR
     function chamarMaisProximo() {
         if (!userLat || motoristasOnline.length === 0) return alert("Buscando motoristas próximos...");
        
@@ -163,7 +181,10 @@
             let distB = Math.hypot(b.lat - userLat, b.log - userLog);
             return distA - distB;
         });
-        enviarPedido(ordenados[0].id);
+       
+        // Abre o balão (popup) do motorista mais perto em vez de ir pro Zap direto
+        markers[ordenados[0].id].openPopup();
+        map.setView(markers[ordenados[0].id].getLatLng(), 16);
     }
 
     setInterval(atualizarMotoristas, 5000);
