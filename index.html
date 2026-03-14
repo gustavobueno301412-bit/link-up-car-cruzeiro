@@ -12,6 +12,14 @@
         .offline { background: #ff4444; color: white; }
         input, textarea { width: 90%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid #444; background: #222; color: white; font-size: 16px; }
         label { display: block; text-align: left; margin-left: 5%; color: #FF8C00; font-size: 12px; font-weight: bold; }
+
+        /* ESTILOS DO MODAL */
+        .modal { display: none; position: fixed; z-index: 999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); }
+        .modal-content { background: #1a1a1a; margin: 10% auto; padding: 20px; border: 2px solid #FF8C00; width: 85%; border-radius: 20px; max-height: 80vh; overflow-y: auto; }
+        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .termos-box { background: #222; padding: 10px; border-radius: 10px; text-align: left; font-size: 13px; color: #ccc; height: 140px; overflow-y: scroll; margin: 15px 0; border: 1px solid #444; line-height: 1.4; }
+        .checkbox-container { display: flex; align-items: center; text-align: left; gap: 10px; margin-bottom: 15px; }
+        .checkbox-container input { width: 22px; height: 22px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -26,21 +34,53 @@
     </div>
 
     <div class="card">
-        <h3>📝 Cadastro Novo / Suporte</h3>
-        <input type="text" id="reg_nome" placeholder="Nome Completo">
-        <input type="text" id="reg_carro" placeholder="Carro e Cor (Ex: Gol Branco)">
-        <input type="text" id="reg_placa" placeholder="Placa">
-        <textarea id="reg_detalhes" placeholder="Detalhes (Ar, 4 portas, etc)"></textarea>
-        <button class="btn" style="background:#444; color:white; font-size: 14px;" onclick="enviarCadastro()">ENVIAR AO GUSTAVO ✅</button>
+        <h3>📝 Novo por aqui?</h3>
+        <button class="btn" style="background:#FF8C00; color:white;" onclick="abrirModal()">FAZER MEU CADASTRO ✅</button>
+    </div>
+
+    <div id="modalCadastro" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="fecharModal()">&times;</span>
+            <h3 style="color:#FF8C00;">Cadastro de Motorista</h3>
+           
+            <input type="text" id="reg_nome" placeholder="Nome Completo">
+            <input type="text" id="reg_carro" placeholder="Carro e Cor (Ex: Gol Branco)">
+            <input type="text" id="reg_placa" placeholder="Placa">
+            <textarea id="reg_detalhes" placeholder="Detalhes (Ar, 4 portas, etc)"></textarea>
+
+            <div class="termos-box">
+                <b>TERMOS DE USO E RESPONSABILIDADE:</b><br><br>
+                1. O motorista autoriza o uso de sua imagem (selfie) e dados do veículo no mapa do app para identificação dos clientes.<br>
+                2. Declaro que todos os documentos e fotos enviados via WhatsApp são verídicos.<br>
+                3. <b>AUTONOMIA:</b> O motorista atua como parceiro autônomo, sem vínculo empregatício, sendo responsável pelos custos do veículo.<br>
+                4. <b>DANOS E RISCOS:</b> Qualquer dano ao veículo, multas, batidas ou acidentes são de inteira responsabilidade do motorista.<br>
+                5. <b>OBJETOS PERDIDOS:</b> O motorista é o responsável pela guarda de objetos esquecidos no carro, devendo zelar pelo bem-estar do cliente.<br>
+                6. <b>BANIMENTO:</b> Condutas inadequadas ou descumprimento de leis de trânsito geram exclusão imediata. Dados protegidos pela LGPD.
+            </div>
+
+            <div class="checkbox-container">
+                <input type="checkbox" id="aceito_termos">
+                <label style="color:white; font-size:14px; cursor: pointer;" for="aceito_termos">Li e aceito os termos de responsabilidade.</label>
+            </div>
+
+            <button class="btn online" onclick="enviarCadastro()">ENVIAR E MANDAR FOTOS ✅</button>
+        </div>
     </div>
 
 <script>
-    // LEMBRE-SE: Use o link da "Nova Implantação" aqui
     const URL_API = "https://script.google.com/macros/s/AKfycbxXQWm-M2KsGtBqkiS0wr2G2pt776ynIWCsbBlmlEX8XNsqFQkubdP5lW244XYHL56W/exec";
-   
+  
     let isOnline = false;
     let watchID = null;
     let lastLat = 0, lastLog = 0;
+
+    function abrirModal() { document.getElementById('modalCadastro').style.display = "block"; }
+    function fecharModal() { document.getElementById('modalCadastro').style.display = "none"; }
+
+    window.onclick = function(event) {
+        let modal = document.getElementById('modalCadastro');
+        if (event.target == modal) { fecharModal(); }
+    }
 
     window.onload = function() {
         const idSalvo = localStorage.getItem('linkup_id');
@@ -54,11 +94,9 @@
     function toggleStatus() {
         const id = document.getElementById('motorista_id').value;
         if(!id) return alert("Digite seu ID antes de começar!");
-
         isOnline = !isOnline;
         const btn = document.getElementById('btn-status');
         const msg = document.getElementById('msg-status');
-       
         if(isOnline) {
             btn.className = "btn online"; btn.innerText = "FICAR OFFLINE 🔴";
             msg.innerText = "VOCÊ ESTÁ ONLINE"; msg.style.color = "#25D366";
@@ -98,13 +136,11 @@
                 body: JSON.stringify(payload)
             });
             const texto = await response.text();
-
             if (texto === "BLOQUEADO") {
                 alert("⚠️ ACESSO NEGADO: Verifique seu pagamento com o Gustavo.");
                 if(isOnline) toggleStatus();
                 return;
             }
-           
             document.getElementById('info-envio').innerText = "Localização enviada: " + new Date().toLocaleTimeString();
         } catch (e) {
             document.getElementById('info-envio').innerText = "Enviando...";
@@ -112,12 +148,22 @@
     }
 
     function enviarCadastro() {
+        const aceito = document.getElementById('aceito_termos').checked;
+        if(!aceito) {
+            return alert("⚠️ Você precisa aceitar os termos antes de enviar!");
+        }
+
         const nome = document.getElementById('reg_nome').value;
         const carro = document.getElementById('reg_carro').value;
         const placa = document.getElementById('reg_placa').value;
         const det = document.getElementById('reg_detalhes').value;
-        const msg = `*LINKUPCAR: NOVO CADASTRO*%0A👤 Nome: ${nome}%0A🚗 Carro: ${carro}%0A📟 Placa: ${placa}%0A📝 Detalhes: ${det}%0A%0A_Favor ativar meu ID e conferir documentos em anexo._`;
+
+        if(!nome || !placa) return alert("Preencha ao menos Nome e Placa!");
+
+        const msg = `*LINKUPCAR: NOVO CADASTRO*%0A👤 Nome: ${nome}%0A🚗 Carro: ${carro}%0A📟 Placa: ${placa}%0A📝 Detalhes: ${det}%0A%0A✅ *ACEITOU OS TERMOS DE RESPONSABILIDADE*%0A%0A_Estou enviando agora em anexo:_%0A1. 🤳 *Minha Selfie (Para o Mapa)*%0A2. 🚗 *Foto do Carro*%0A3. 🪪 *CNH*%0A4. 📄 *Antecedentes Criminais*`;
+       
         window.open(`https://wa.me/5512992448264?text=${msg}`, '_blank');
+        fecharModal();
     }
 </script>
 </body>
