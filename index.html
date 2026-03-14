@@ -5,131 +5,122 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LinkUpCar - Motorista</title>
     <style>
-        /* MANTENDO SUA ESTÉTICA EXATAMENTE COMO ESTÁ */
         body { margin: 0; padding: 20px; background: #121212; color: white; font-family: sans-serif; text-align: center; }
-        .status-card {
-            background: #1a1a1a; padding: 30px; border-radius: 20px;
-            border: 2px solid #FF8C00; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-        .btn-toggle {
-            width: 100%; padding: 20px; border-radius: 50px; border: none;
-            font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 20px;
-            transition: 0.3s;
-        }
-        .online { background: #25D366; color: white; box-shadow: 0 0 20px #25D366; }
+        .card { background: #1a1a1a; padding: 20px; border-radius: 20px; border: 2px solid #FF8C00; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        .btn { width: 100%; padding: 18px; border-radius: 50px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .online { background: #25D366; color: white; box-shadow: 0 0 15px #25D366; }
         .offline { background: #ff4444; color: white; }
-        .info { margin-top: 20px; color: #888; font-size: 14px; }
+        input, textarea { width: 90%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid #444; background: #222; color: white; font-size: 16px; }
+        label { display: block; text-align: left; margin-left: 5%; color: #FF8C00; font-size: 12px; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <div class="status-card">
-        <h2 id="msg-status">VOCÊ ESTÁ OFFLINE</h2>
-        <p>Ative para começar a receber corridas em Cruzeiro</p>
-        <button id="btn-status" class="btn-toggle offline" onclick="toggleStatus()">FICAR ONLINE 🟢</button>
-        <div class="info">
-            ID do Motorista: <b id="display-id">---</b><br>
-            Último sinal: <span id="time">---</span>
-        </div>
+    <div class="card">
+        <label>DIGITE SEU ID DA PLANILHA:</label>
+        <input type="number" id="motorista_id" placeholder="Ex: 1" onchange="salvarID()">
+       
+        <h2 id="msg-status" style="margin-top: 20px;">VOCÊ ESTÁ OFFLINE</h2>
+        <button id="btn-status" class="btn offline" onclick="toggleStatus()">FICAR ONLINE 🟢</button>
+        <p id="info-envio" style="font-size: 11px; color: #888; margin-top: 10px;">GPS aguardando...</p>
+    </div>
+
+    <div class="card">
+        <h3>📝 Cadastro Novo / Suporte</h3>
+        <input type="text" id="reg_nome" placeholder="Nome Completo">
+        <input type="text" id="reg_carro" placeholder="Carro e Cor (Ex: Gol Branco)">
+        <input type="text" id="reg_placa" placeholder="Placa">
+        <textarea id="reg_detalhes" placeholder="Detalhes (Ar, 4 portas, etc)"></textarea>
+        <button class="btn" style="background:#444; color:white; font-size: 14px;" onclick="enviarCadastro()">ENVIAR AO GUSTAVO ✅</button>
     </div>
 
 <script>
-    // URL DA SUA API (MANTIDA)
-    const URL_API = "https://script.google.com/macros/s/AKfycbxgrfsKqSC18HTvnfZL1NaEnZI_tZszhVJrBj13GNSyh22C4zLFU2JPVtzRVv3N-6Ql/exec";
+    // LEMBRE-SE: Use o link da "Nova Implantação" aqui
+    const URL_API = "https://script.google.com/macros/s/AKfycbxXQWm-M2KsGtBqkiS0wr2G2pt776ynIWCsbBlmlEX8XNsqFQkubdP5lW244XYHL56W/exec";
    
-    // Mude aqui para o seu ID da planilha (ex: 1 para Gustavo)
-    const MOTORISTA_ID = 1;
-    document.getElementById('display-id').innerText = MOTORISTA_ID;
-
     let isOnline = false;
     let watchID = null;
-    let userLat, userLog;
+    let lastLat = 0, lastLog = 0;
 
-    // 1. FUNÇÃO PARA ATUALIZAR STATUS E POSIÇÃO (ERRO 3 E 5)
-    async function enviarSinal() {
-        if (!isOnline || !userLat) return;
+    window.onload = function() {
+        const idSalvo = localStorage.getItem('linkup_id');
+        if(idSalvo) document.getElementById('motorista_id').value = idSalvo;
+    }
 
-        const payload = {
-            tipo: "STATUS_MOTORISTA",
-            id: MOTORISTA_ID,
-            status_rua: "ativo",
-            lat: userLat,
-            log: userLog
-        };
-
-        try {
-            await fetch(URL_API, {
-                method: "POST",
-                mode: "no-cors", // Necessário para Google Apps Script
-                body: JSON.stringify(payload)
-            });
-            document.getElementById('time').innerText = new Date().toLocaleTimeString();
-            console.log("Sinal enviado:", userLat, userLog);
-        } catch (e) {
-            console.error("Erro ao enviar sinal");
-        }
+    function salvarID() {
+        localStorage.setItem('linkup_id', document.getElementById('motorista_id').value);
     }
 
     function toggleStatus() {
+        const id = document.getElementById('motorista_id').value;
+        if(!id) return alert("Digite seu ID antes de começar!");
+
+        isOnline = !isOnline;
         const btn = document.getElementById('btn-status');
         const msg = document.getElementById('msg-status');
-
-        if (!isOnline) {
-            // FICAR ONLINE
-            isOnline = true;
-            btn.innerText = "FICAR OFFLINE 🔴";
-            btn.className = "btn-toggle online";
-            msg.innerText = "VOCÊ ESTÁ ONLINE";
-            msg.style.color = "#25D366";
-           
-            // Inicia o rastreio do GPS
-            startTracking();
+       
+        if(isOnline) {
+            btn.className = "btn online"; btn.innerText = "FICAR OFFLINE 🔴";
+            msg.innerText = "VOCÊ ESTÁ ONLINE"; msg.style.color = "#25D366";
+            iniciarGPS();
         } else {
-            // FICAR OFFLINE
-            isOnline = false;
-            btn.innerText = "FICAR ONLINE 🟢";
-            btn.className = "btn-toggle offline";
-            msg.innerText = "VOCÊ ESTÁ OFFLINE";
-            msg.style.color = "#ff4444";
-           
-            stopTracking();
-            enviarSinalInativo();
+            btn.className = "btn offline"; btn.innerText = "FICAR ONLINE 🟢";
+            msg.innerText = "VOCÊ ESTÁ OFFLINE"; msg.style.color = "#ff4444";
+            pararGPS();
         }
     }
 
-    function startTracking() {
+    function iniciarGPS() {
         if ("geolocation" in navigator) {
-            watchID = navigator.geolocation.watchPosition((pos) => {
-                userLat = pos.coords.latitude;
-                userLog = pos.coords.longitude;
-            }, (err) => {
-                alert("Ative o GPS para trabalhar!");
-            }, { enableHighAccuracy: true });
+            watchID = navigator.geolocation.watchPosition(pos => {
+                let lat = pos.coords.latitude;
+                let log = pos.coords.longitude;
+                if (Math.abs(lat - lastLat) > 0.0001 || Math.abs(log - lastLog) > 0.0001) {
+                    enviarDados(lat, log, "ativo");
+                    lastLat = lat; lastLog = log;
+                }
+            }, null, { enableHighAccuracy: true });
         }
     }
 
-    function stopTracking() {
-        if (watchID) navigator.geolocation.clearWatch(watchID);
+    function pararGPS() {
+        if(watchID) navigator.geolocation.clearWatch(watchID);
+        enviarDados(0, 0, "inativo");
+        document.getElementById('info-envio').innerText = "Sinal desligado.";
     }
 
-    // Sinal para sair do mapa quando desligar
-    async function enviarSinalInativo() {
-        const payload = {
-            tipo: "STATUS_MOTORISTA",
-            id: MOTORISTA_ID,
-            status_rua: "inativo",
-            lat: 0,
-            log: 0
-        };
-        fetch(URL_API, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
+    async function enviarDados(lat, log, status) {
+        const id = document.getElementById('motorista_id').value;
+        const payload = { tipo: "STATUS_MOTORISTA", id: id, status_rua: status, lat: lat, log: log };
+        try {
+            const response = await fetch(URL_API, {
+                method: "POST",
+                body: JSON.stringify(payload)
+            });
+            const texto = await response.text();
+
+            if (texto === "BLOQUEADO") {
+                alert("⚠️ ACESSO NEGADO: Verifique seu pagamento com o Gustavo.");
+                if(isOnline) toggleStatus();
+                return;
+            }
+           
+            document.getElementById('info-envio').innerText = "Localização enviada: " + new Date().toLocaleTimeString();
+        } catch (e) {
+            document.getElementById('info-envio').innerText = "Enviando...";
+        }
     }
 
-    // LOOP DE "ONLINE SEMPRE" (ERRO 5)
-    setInterval(enviarSinal, 5000); // Envia sinal a cada 5 segundos
+    function enviarCadastro() {
+        const nome = document.getElementById('reg_nome').value;
+        const carro = document.getElementById('reg_carro').value;
+        const placa = document.getElementById('reg_placa').value;
+        const det = document.getElementById('reg_detalhes').value;
+        const msg = `*LINKUPCAR: NOVO CADASTRO*%0A👤 Nome: ${nome}%0A🚗 Carro: ${carro}%0A📟 Placa: ${placa}%0A📝 Detalhes: ${det}%0A%0A_Favor ativar meu ID e conferir documentos em anexo._`;
+        window.open(`https://wa.me/5512992448264?text=${msg}`, '_blank');
+    }
 </script>
 </body>
 </html>
-
- 
 
  

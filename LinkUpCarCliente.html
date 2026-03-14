@@ -7,8 +7,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        /* MANTENDO SUA ESTÉTICA EXATAMENTE COMO ESTAVA */
-        body { margin: 0; padding: 0; background: #121212; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { margin: 0; padding: 0; background: #121212; color: white; font-family: sans-serif; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
        
         .control-panel {
@@ -17,177 +16,174 @@
             background: rgba(26, 26, 26, 0.95); padding: 15px;
             border-radius: 20px; border: 2px solid #FF8C00; box-shadow: 0 10px 30px rgba(0,0,0,0.7);
         }
+        input { width: 100%; padding: 12px; margin: 5px 0; border-radius: 10px; border: 1px solid #444; background: #1a1a1a; color: white; font-size: 16px; box-sizing: border-box; }
+        .price-info { background: #FF8C00; color: #000; font-weight: bold; text-align: center; padding: 10px; border-radius: 10px; margin-top: 8px; font-size: 14px; }
 
-        input {
-            width: 100%; padding: 12px; margin: 5px 0; border-radius: 10px;
-            border: 1px solid #444; background: #1a1a1a; color: white; font-size: 16px; box-sizing: border-box;
+        .map-tools { position: fixed; right: 15px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 10px; z-index: 1000; }
+        .tool-btn { background: #FF8C00; color: white; border: none; width: 45px; height: 45px; border-radius: 10px; font-size: 20px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+
+        .driver-marker { width: 55px; height: 55px; border-radius: 50%; border: 3px solid #FF8C00; background-size: cover; background-position: center; box-shadow: 0 0 15px #FF8C00; }
+       
+        .user-label {
+            background: white; color: black; padding: 4px 10px; border-radius: 10px;
+            font-weight: bold; font-size: 12px; border: 2px solid #007AFF;
+            white-space: nowrap; position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
         }
 
-        .price-info {
-            background: #FF8C00; color: #000; font-weight: bold;
-            text-align: center; padding: 10px; border-radius: 10px; margin-top: 8px; font-size: 14px;
-        }
-
-        .driver-marker {
-            width: 55px; height: 55px; border-radius: 50%; border: 3px solid #FF8C00;
-            background-size: cover; background-position: center; box-shadow: 0 0 15px #FF8C00;
-        }
-
-        .btn-call-fast {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: #FF8C00; color: white; padding: 18px; width: 85%; max-width: 320px;
-            border-radius: 50px; font-weight: bold; border: none; z-index: 1000;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.5); cursor: pointer; font-size: 16px;
-        }
-
-        .leaflet-popup-content-wrapper { background: #1a1a1a !important; color: white !important; border: 1px solid #FF8C00; }
-        .leaflet-popup-tip { background: #FF8C00 !important; }
+        .btn-call-fast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #FF8C00; color: white; padding: 18px; width: 85%; max-width: 320px; border-radius: 50px; font-weight: bold; border: none; z-index: 1000; font-size: 16px; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <div class="control-panel">
         <input type="text" id="nome_cliente" placeholder="👤 Seu nome">
-        <input type="text" id="destino" placeholder="🏁 Para onde vamos em Cruzeiro?">
-        <input type="text" id="referencia" placeholder="📍 Ponto de referência">
+        <input type="text" id="destino" placeholder="🏁 Destino (Ex: Rodoviária)">
+        <input type="text" id="referencia" placeholder="📍 Ponto de Referência">
+       
         <div id="info-corrida" class="price-info" style="display:none;">
-            📏 Distância: <span id="km">0</span> km | 💰 Valor: R$ <span id="valor">0,00</span>
+            📏 <span id="km">0</span> km | 💰 R$ <span id="valor">0,00</span>
         </div>
     </div>
 
-    <div id="map"></div>
+    <div class="map-tools">
+        <button class="tool-btn" onclick="map.setZoom(map.getZoom() + 1)">+</button>
+        <button class="tool-btn" onclick="map.setZoom(map.getZoom() - 1)">-</button>
+        <button class="tool-btn" onclick="toggleMapTheme()" id="btn-theme">🌙</button>
+    </div>
 
+    <div id="map"></div>
     <button class="btn-call-fast" onclick="chamarMaisProximo()">⚡ CHAMAR O MAIS PRÓXIMO</button>
 
 <script>
-    // URL DA SUA API (MANTIDA)
-    const URL_API = "https://script.google.com/macros/s/AKfycbxgrfsKqSC18HTvnfZL1NaEnZI_tZszhVJrBj13GNSyh22C4zLFU2JPVtzRVv3N-6Ql/exec";
+    const URL_API = "https://script.google.com/macros/s/AKfycbxXQWm-M2KsGtBqkiS0wr2G2pt776ynIWCsbBlmlEX8XNsqFQkubdP5lW244XYHL56W/exec";
    
-    // VARIÁVEIS DE CONFIGURAÇÃO (AGORA ATUALIZADAS PELA PLANILHA)
     let TAXA_MINIMA = 8.00;
     let VALOR_KM = 2.50;
+    let userLat, userLog;
+    let isDarkMode = true;
+    let markers = {};
+    let motoristasOnline = [];
 
     const map = L.map('map', { zoomControl: false }).setView([-22.5774, -44.9703], 15);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+    const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png');
+    const lightLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+    darkLayer.addTo(map);
 
-    let motoristasOnline = [];
-    let markers = {};
-    let userLat, userLog;
-    let primeiraVez = true; // CORREÇÃO DO ERRO 1 (ZOOM)
+    function toggleMapTheme() {
+        if (isDarkMode) { map.removeLayer(darkLayer); lightLayer.addTo(map); document.getElementById('btn-theme').innerText = "☀️"; }
+        else { map.removeLayer(lightLayer); darkLayer.addTo(map); document.getElementById('btn-theme').innerText = "🌙"; }
+        isDarkMode = !isDarkMode;
+    }
 
-    // 1. Localizar Cliente
+    const userIcon = L.divIcon({
+        html: `<div class="user-label">Você está aqui</div><div style="font-size: 35px;">🙋‍♂️</div>`,
+        className: '', iconSize: [40, 40], iconAnchor: [20, 20]
+    });
+
     map.locate({watch: true, enableHighAccuracy: true});
     map.on('locationfound', (e) => {
-        userLat = e.latlng.lat;
-        userLog = e.latlng.lng;
-       
-        // CORREÇÃO ZOOM: Só centraliza na primeira vez que abre
-        if (primeiraVez) {
-            map.setView(e.latlng, 16);
-            primeiraVez = false;
-        }
-
+        userLat = e.latlng.lat; userLog = e.latlng.lng;
         if (!markers['meu_ponto']) {
-            markers['meu_ponto'] = L.circle(e.latlng, {radius: 12, color: '#007AFF', fillOpacity: 0.8}).addTo(map);
-        } else {
-            markers['meu_ponto'].setLatLng(e.latlng);
-        }
+            markers['meu_ponto'] = L.marker(e.latlng, {icon: userIcon}).addTo(map);
+            map.setView(e.latlng, 16);
+        } else { markers['meu_ponto'].setLatLng(e.latlng); }
     });
 
-    // 2. Cálculo de preço (CORREÇÃO DO ERRO 4: USANDO TAXAS DA PLANILHA)
-    document.getElementById('destino').addEventListener('input', function() {
-        if(!userLat) return;
-        let kmSimulado = (Math.random() * (5 - 1.5) + 1.5).toFixed(1);
-        let valorFinal = (parseFloat(TAXA_MINIMA) + (kmSimulado * parseFloat(VALOR_KM))).toFixed(2);
+   // Substitua a função atualizarMotoristas no seu arquivo por esta aqui:
+
+async function atualizarMotoristas() {
+    try {
+        // Lembre-se de conferir se a URL_API abaixo está com o seu link novo
+        const res = await fetch(URL_API + "?action=getOnlineDrivers");
+        const data = await res.json();
+        motoristasOnline = data.motoristas || [];
        
-        document.getElementById('info-corrida').style.display = 'block';
-        document.getElementById('km').innerText = kmSimulado;
-        document.getElementById('valor').innerText = valorFinal.replace('.', ',');
-    });
+        motoristasOnline.forEach(m => {
+            let mLat = parseFloat(m.lat);
+            let mLog = parseFloat(m.log);
 
-    async function atualizarMotoristas() {
-        try {
-            // A API agora precisa retornar motoristas E as configurações da planilha
-            const res = await fetch(URL_API + "?action=getOnlineDrivers");
-            const data = await res.json();
-           
-            // Sincroniza os preços com a planilha
-            TAXA_MINIMA = data.taxa_minima || 8.00;
-            VALOR_KM = data.preco_km || 2.50;
-            motoristasOnline = data.motoristas || [];
-           
-            motoristasOnline.forEach(m => {
+            if (!isNaN(mLat) && mLat !== 0) {
                 if (!markers[m.id]) {
+                    // Aqui mantém o seu bonequinho com a borda laranja
                     let icon = L.divIcon({
                         html: `<div class="driver-marker" style="background-image: url('${m.foto_perfil}')"></div>`,
                         className: '', iconSize: [55, 55]
                     });
-                    markers[m.id] = L.marker([m.lat, m.log], {icon}).addTo(map);
                    
+                    markers[m.id] = L.marker([mLat, mLog], {icon}).addTo(map);
+                   
+                    // AQUI É A MÁGICA: O balão com todos os detalhes que você pediu
                     markers[m.id].bindPopup(`
-                        <div style="text-align:center; min-width:150px;">
+                        <div style="text-align:center; color:white; min-width:160px; font-family: sans-serif;">
                             <b style="color:#FF8C00; font-size:18px;">${m.nome}</b><br>
-                            <img src="${m.foto_carro}" style="width:140px; border-radius:8px; margin:8px 0; border:1px solid #444;"><br>
-                            <div style="margin-bottom:10px;">
-                                <span style="font-weight:bold; color:white;">🚗 ${m.carro}</span>
+                            <img src="${m.foto_carro}" style="width:140px; border-radius:10px; margin:8px 0; border: 1px solid #444;"><br>
+                            <div style="background:#333; padding:8px; border-radius:8px; margin-bottom:10px;">
+                                <span style="font-size:14px; display:block;">🚗 ${m.carro}</span>
+                                <span style="font-size:12px; color:#FF8C00; font-weight:bold; display:block; margin-top:4px;">📟 PLACA: ${m.placa}</span>
                             </div>
-                            <button onclick="enviarPedido('${m.id}')" style="background:#25D366; color:white; border:none; padding:12px; border-radius:8px; width:100%; font-weight:bold; cursor:pointer;">
-                                SOLICITAR AGORA ✅
-                            </button>
+                            <button onclick="enviarPedido('${m.id}')" style="background:#25D366; color:white; border:none; padding:12px; border-radius:8px; width:100%; font-weight:bold; cursor:pointer; font-size:14px;">SOLICITAR AGORA ✅</button>
                         </div>
                     `);
                 } else {
-                    markers[m.id].setLatLng([m.lat, m.log]);
+                    markers[m.id].setLatLng([mLat, mLog]);
                 }
-            });
-        } catch (e) { console.log("Erro ao atualizar motoristas"); }
+            }
+        });
+    } catch (e) {
+        console.error("Erro ao buscar motoristas");
+    }
+}
+
+ 
+
+ 
+
+
+    async function calcularPrecoReal() {
+        let destTxt = document.getElementById('destino').value;
+        if (destTxt.length < 3 || !userLat) return;
+        try {
+            const busca = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${destTxt}, Cruzeiro SP`);
+            const d = await busca.json();
+            if (d.length > 0) {
+                const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${userLog},${userLat};${d[0].lon},${d[0].lat}?overview=false`);
+                const res = await r.json();
+                let distKm = (res.routes[0].distance / 1000).toFixed(1);
+                let valor = (TAXA_MINIMA + (distKm * VALOR_KM));
+                document.getElementById('info-corrida').style.display = 'block';
+                document.getElementById('km').innerText = distKm;
+                document.getElementById('valor').innerText = valor.toFixed(2).replace('.', ',');
+            }
+        } catch (e) {}
     }
 
-    // 3. Enviar pedido (CORREÇÃO DO LINK DO MAPA COM CRASE)
+    document.getElementById('destino').addEventListener('input', () => {
+        clearTimeout(window.tOut);
+        window.tOut = setTimeout(calcularPrecoReal, 1000);
+    });
+
     function enviarPedido(id) {
         let m = motoristasOnline.find(x => x.id == id);
-        let nome = document.getElementById('nome_cliente').value;
-        let dest = document.getElementById('destino').value;
-        let ref = document.getElementById('referencia').value || "Não informada";
-        let km = document.getElementById('km').innerText;
-        let valor = document.getElementById('valor').innerText;
-
-        if(!nome) return alert("Por favor, digite seu nome!");
-        if(!dest) return alert("Por favor, digite seu destino!");
-
-        // Link corrigido para o motorista conseguir clicar e navegar
-        let linkMapa = `https://www.google.com/maps?q=${userLat},${userLog}`;
-
-        let msg = `*LINKUPCAR: NOVO PEDIDO*%0A` +
-                  `------------------------------%0A` +
-                  `👤 *Passageiro:* ${nome}%0A` +
-                  `🏁 *Destino:* ${dest}%0A` +
-                  `📍 *Referência:* ${ref}%0A%0A` +
-                  `📏 *Distância:* ${km} km%0A` +
-                  `💰 *Valor:* R$ ${valor}%0A` +
-                  `------------------------------%0A` +
-                  `📍 *Localização Atual (GPS):*%0A${linkMapa}%0A%0A` +
-                  `_Olá ${m.nome}, pode me buscar?_`;
-
+        let n = document.getElementById('nome_cliente').value;
+        let d = document.getElementById('destino').value;
+        let r = document.getElementById('referencia').value || "Não informada";
+        let k = document.getElementById('km').innerText;
+        let v = document.getElementById('valor').innerText;
+       
+        if(!n || !d) return alert("Preencha seu nome e destino!");
+       
+        let linkGps = "https://www.google.com/maps?q=" + userLat + "," + userLog;
+        let msg = `*LINKUPCAR: PEDIDO*%0A👤 Passageiro: ${n}%0A🏁 Destino: ${d}%0A📍 Ref: ${r}%0A📏 Km: ${k}%0A💰 Valor: R$ ${v}%0A📍 Local: ${linkGps}`;
         window.open(`https://wa.me/55${m.whatsapp}?text=${msg}`, '_blank');
     }
 
-    // CORREÇÃO DO ERRO 2: MOSTRAR DETALHES ANTES DE CHAMAR
     function chamarMaisProximo() {
-        if (!userLat || motoristasOnline.length === 0) return alert("Buscando motoristas próximos...");
-       
-        let ordenados = motoristasOnline.sort((a, b) => {
-            let distA = Math.hypot(a.lat - userLat, a.log - userLog);
-            let distB = Math.hypot(b.lat - userLat, b.log - userLog);
-            return distA - distB;
-        });
-       
-        // Abre o balão (popup) do motorista mais perto em vez de ir pro Zap direto
-        markers[ordenados[0].id].openPopup();
-        map.setView(markers[ordenados[0].id].getLatLng(), 16);
+        if (motoristasOnline.length === 0) return alert("Nenhum motorista online!");
+        let ord = motoristasOnline.sort((a,b) => Math.hypot(a.lat-userLat, a.log-userLog) - Math.hypot(b.lat-userLat, b.log-userLog));
+        markers[ord[0].id].openPopup();
     }
 
-    setInterval(atualizarMotoristas, 5000);
+    setInterval(atualizarMotoristas, 7000);
     atualizarMotoristas();
 </script>
 </body>
